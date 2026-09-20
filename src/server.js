@@ -6,10 +6,10 @@ const { startCustomSmtpServer } = require('./services/customSmtpServer');
 
 const app = express();
 
-// Set JSON Response Formatting (Formatted / Pretty Print JSON dengan 2 spasi Indentasi)
+// Set JSON Response Formatting (Pretty Print 2 Spaces)
 app.set('json spaces', 2);
 
-// Pterodactyl / Wisp menggunakan SERVER_PORT atau PORT
+// Pterodactyl / Wisp / Vercel Port
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
@@ -21,9 +21,10 @@ app.use(express.urlencoded({ extended: true }));
 // Welcome / Index Route
 app.get('/', (req, res) => {
   res.json({
-    name: 'SMTP Temp Mail API & Custom SMTP Server Service',
+    name: 'SMTP Temp Mail API Service',
     version: '1.0.0',
-    description: 'API & Custom Embedded SMTP Server running on Pterodactyl / Wispbyte',
+    description: 'REST API Gateway pengiriman email (Vercel & Pterodactyl Compatible)',
+    platform: process.env.VERCEL ? 'Vercel Serverless' : 'Node.js Standalone',
     endpoints: {
       sendEmail: 'POST /api/v1/email/send',
       createTempAccount: 'POST /api/v1/email/temp-account',
@@ -31,8 +32,9 @@ app.get('/', (req, res) => {
       healthCheck: 'GET /api/v1/email/health'
     },
     customSmtpServer: {
-      enabled: process.env.ENABLE_CUSTOM_SMTP === 'true',
-      port: process.env.CUSTOM_SMTP_PORT || 2525
+      enabled: !process.env.VERCEL && process.env.ENABLE_CUSTOM_SMTP !== 'false',
+      port: process.env.CUSTOM_SMTP_PORT || 2525,
+      note: process.env.VERCEL ? 'TCP Custom SMTP Server disembunyikan di Vercel Serverless. Gunakan REST API Endpoint untuk Vercel.' : 'Aktif'
     }
   });
 });
@@ -58,16 +60,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Express API Server
-app.listen(PORT, HOST, () => {
-  console.log(`====================================================`);
-  console.log(`🚀 API Server Running on Pterodactyl / Wispbyte`);
-  console.log(`📍 Listening on: http://${HOST}:${PORT}`);
-  console.log(`✉️  Endpoint Send: http://${HOST}:${PORT}/api/v1/email/send`);
-  console.log(`====================================================`);
+// Jalankan Standalone Server (Hanya jika tidak berjalan sebagai Vercel Serverless Function)
+if (!process.env.VERCEL) {
+  app.listen(PORT, HOST, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 API Server Running on http://${HOST}:${PORT}`);
+    console.log(`✉️  Endpoint Send: http://${HOST}:${PORT}/api/v1/email/send`);
+    console.log(`====================================================`);
 
-  // Jalankan Custom Embedded SMTP Server jika ENABLE_CUSTOM_SMTP=true (default: true)
-  if (process.env.ENABLE_CUSTOM_SMTP !== 'false') {
-    startCustomSmtpServer();
-  }
-});
+    if (process.env.ENABLE_CUSTOM_SMTP !== 'false') {
+      startCustomSmtpServer();
+    }
+  });
+}
+
+// Export Express app untuk Vercel Serverless Deployment
+module.exports = app;
